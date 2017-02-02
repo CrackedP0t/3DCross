@@ -1,17 +1,17 @@
 # TARGET #
 
-TARGET := 3DS
+TARGET := PC
 LIBRARY := 0
 
 ifeq ($(TARGET),$(filter $(TARGET),3DS WIIU))
-	ifeq ($(strip $(DEVKITPRO)),)
-		$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>devkitPro")
-	endif
+ifeq ($(strip $(DEVKITPRO)),)
+$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>devkitPro")
+endif
 endif
 
 # COMMON CONFIGURATION #
 
-NAME := 3DSCross
+NAME := 3DCross
 
 BUILD_DIR := build
 OUTPUT_DIR := output
@@ -62,4 +62,15 @@ LOGO :=
 
 # INTERNAL #
 
+ifeq ($(TARGET), 3DS)
 include buildtools/make_base
+endif
+
+ifeq ($(TARGET), PC)
+all:
+	mkdir -p $(OUTPUT_DIR)/pc
+	gcc -DPC source/*.c -Iinclude -o $(OUTPUT_DIR)/pc/$(NAME)
+
+clean:
+	rm -r $(OUTPUT_DIR)
+endif

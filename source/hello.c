@@ -1,14 +1,15 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 
 #include "encoder.h"
 #include "send.h"
 #include "packet.h"
 #include "util.h"
 
-#if ENCODER == bencode
-static void *create_caps(size_t *caps_size_out) {
+static inline Bencode *create_caps() {
 	Bencode *data = ben_list();
 
 	Bencode *hello = ben_str("hello");
@@ -30,47 +31,44 @@ static void *create_caps(size_t *caps_size_out) {
 	ben_dict_set_by_str(caps, "encoders", encoders);
 	ben_dict_set_by_str(caps, "encodings", encodings);
 	ben_dict_set_by_str(caps, "keyboard", ben_int(0));
-	ben_dict_set_by_str(caps, "share", ben_int(1));
+
+	// A capability is missing somewhere, so when another client joins and sends
+	// the info-request packet the server errors and disconnects it
+	ben_dict_set_by_str(caps, "share", ben_int(0));
+
+	Bencode *size = ben_list();
+	ben_list_append(size, ben_int(400));
+	ben_list_append(size, ben_int(240));
+
+	ben_dict_set_by_str(caps, "desktop_size", size);
+
 	ben_dict_set_by_str(caps, "version", ben_str("1.0.1"));
 	ben_dict_set_by_str(caps, "windows", ben_int(1));
 
+	srand(time(NULL));
+
+	// This should be a way to uniquely identify 3DSes, but this will work for now.
+	// We do have to provide `uuid`, or else the server errors when sending `server-event`.
+	char * uuid = malloc(50);
+	sprintf(uuid, "%x%x%x%x", rand(), rand(), rand(), rand());
+
+	ben_dict_set_by_str(caps, "uuid", ben_str(uuid));
+
 	ben_list_append(data, caps);
 
-	void *body = ben_encode(caps_size_out, data);
+	free(uuid);
+	caps = hello = encodings = encoders = window_states = NULL;
 
-	ben_free(data);
-
-	data = caps = hello = encodings = encoders = window_states = NULL;
-
-	return body;
+	return data;
 }
-#elif ENCODER == yaml
-static void *create_caps(size_t *caps_size_out) {
-
-}
-#endif
 
 int send_hello(int sockfd) {
-	size_t *body_size_out = malloc(sizeof *body_size_out);
+	Bencode *obj = create_caps();
 
-	void *body = create_caps(body_size_out);
+	int sendres = send_bencode(sockfd, obj);
 
-	size_t body_size = *body_size_out;
-
-	size_t *packet_size_out = malloc(sizeof *packet_size_out);
-
-	void *packet = make_both(packet_size_out, body, body_size);
-
-	size_t packet_size = *packet_size_out;
-
-	int sendres = send_packet(sockfd, packet, packet_size);
-
-	free(body_size_out);
-	free(body);
-	free(packet_size_out);
-	free(packet);
-
-	body_size_out = body = packet_size_out = packet = NULL;
+	ben_free(obj);
+	obj = NULL;
 
 	return sendres;
 }

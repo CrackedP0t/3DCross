@@ -1,0 +1,10 @@
+* Bugs with Xpra:
+** When an empty dict is sent by the client as the 7th item of a map-window packet, the server prints no errors but sends no more packets, including ping packets.
+** When certain capabilities are not set (I'm not sure of which ones) and an info-request packet is sent, the server errors and disconnects all clients.
+** When a map-window packet is not sent back after a new-window packet is recieved, a draw packet is not sent when a new window opens. However, afterwards, if the server decides another draw packet is needed (for example if the window's contents change), it does send a packet.
+*** The fact that the server won't send draw packets until a map-window packet is recieved could be a feature, but that's not the case here. The server will send draw packets, just not an initial one.
+* Bencode tips:
+** If one takes a bencode object from a dict with ben_dict_get/ben_list_get, it still belongs to the original, so ben_free'ing the parent will still free the child, which will cause problems if one ben_free's the other parent. Use ben_clone or ben_dict_pop/ben_list_pop to avoid this.
+* Coding style:
+** #include's should be listed in this order: system, then libraries, then project. Additionally, they should be organized in alphanumeric order within their categories.
+** Pointers should be malloc'd like this wherever possible: `type` *`var` = malloc(sizeof *`var`);

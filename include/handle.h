@@ -1,8 +1,7 @@
 #pragma once
 
-#include "encoder.h"
+#include <stdarg.h>
 
-int handle_packet(Decoded *decoded) {
+#include "recieve.h"
 
-	return 1;
-}
+int handle_packet(int sockfd, Body *decoded);

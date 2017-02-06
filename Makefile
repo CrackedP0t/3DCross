@@ -1,6 +1,6 @@
 # TARGET #
 
-TARGET := PC
+TARGET ?= PC
 LIBRARY := 0
 
 ifeq ($(TARGET),$(filter $(TARGET),3DS WIIU))
@@ -69,7 +69,7 @@ endif
 ifeq ($(TARGET), PC)
 all:
 	mkdir -p $(OUTPUT_DIR)/pc
-	gcc -DPC source/*.c -Iinclude -o $(OUTPUT_DIR)/pc/$(NAME)
+	gcc -Wall -DPC source/*.c -Iinclude -o $(OUTPUT_DIR)/pc/$(NAME)
 
 clean:
 	rm -r $(OUTPUT_DIR)

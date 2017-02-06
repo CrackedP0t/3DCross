@@ -3,7 +3,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
-#include "encoder.h"
+#include "recieve.h"
 
 #define HEADER_SIZE 8
 
@@ -23,4 +23,4 @@ void *make_both(size_t *packet_size_out, void *body, size_t body_size);
 
 void decode_header(Header *header, void *bytes);
 
-Decoded *decode_body(void *data, size_t data_size);
+Body *decode_body(void *data, size_t data_size);

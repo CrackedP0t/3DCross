@@ -69,7 +69,7 @@ endif
 ifeq ($(TARGET), PC)
 all:
 	mkdir -p $(OUTPUT_DIR)/pc
-	gcc -Wall -DPC source/*.c -Iinclude -o $(OUTPUT_DIR)/pc/$(NAME)
+	gcc -Wall -g -DPC source/*.c -Iinclude -o $(OUTPUT_DIR)/pc/$(NAME)
 
 clean:
 	rm -r $(OUTPUT_DIR)

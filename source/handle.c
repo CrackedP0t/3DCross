@@ -91,8 +91,8 @@ int handle_packet(int sockfd, Body *body) {
 		size_t name_len = ben_str_len(name_ben) + 1; // For \0 at end
 		const char *name_str = ben_str_val(name_ben);
 
-		char *name = malloc(name_len + 1);
-		memcpy(name, name_str, name_len + 1);
+		char *name = malloc(name_len);
+		memcpy(name, name_str, name_len);
 
 		printf("recv: %s\n", name);
 

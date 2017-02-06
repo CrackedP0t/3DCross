@@ -24,8 +24,6 @@ static inline Bencode *create_caps() {
 	Bencode *encoders = ben_list();
 	ben_list_append(encoders, ben_str("bencode"));
 
-	Bencode *window_states = ben_list();
-
 	ben_dict_set_by_str(caps, "bencode", ben_int(1));
 	ben_dict_set_by_str(caps, "rencode", ben_int(0));
 	ben_dict_set_by_str(caps, "encoders", encoders);
@@ -57,7 +55,8 @@ static inline Bencode *create_caps() {
 	ben_list_append(data, caps);
 
 	free(uuid);
-	caps = hello = encodings = encoders = window_states = NULL;
+	uuid = NULL;
+	caps = hello = encodings = encoders = NULL;
 
 	return data;
 }

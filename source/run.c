@@ -139,12 +139,16 @@ int loop(int sockfd) {
 		Chunk *next = NULL;
 		LIST_FOREACH_SAFE(chunk, &body->head, chunks, next) {
 			LIST_REMOVE(chunk, chunks);
+			free(chunk->bytes);
 			free(chunk);
 			chunk = NULL;
 		}
 
+		free(body->string);
 		free(body);
 		body = NULL;
+
+		exit(0);
 
 		if (res == -1) {
 			return 0;

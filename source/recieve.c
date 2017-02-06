@@ -15,9 +15,14 @@ static void *get_packet(int sockfd, Header *header, int *error) {
 
 	ssize_t header_len = recv(sockfd, header_bytes, HEADER_SIZE, 0);
 	if (header_len == -1) {
-		*error = errno;
 		free(header_bytes);
 		header_bytes = NULL;
+		if (errno != EAGAIN && errno != EWOULDBLOCK) {
+			perror("Error in header recv()");
+			*error = 1;
+		} else {
+			*error = -2;
+		}
 		return NULL;
 	}
 
@@ -33,9 +38,14 @@ static void *get_packet(int sockfd, Header *header, int *error) {
 	while (total_len < header->size) {
 		ssize_t body_len = recv(sockfd, body_bytes + total_len, header->size - total_len, 0);
 		if (body_len == -1) {
-			*error = 1;
 			free(body_bytes);
 			body_bytes = NULL;
+			if (errno != EAGAIN && errno != EWOULDBLOCK) {
+				perror("Error in body recv()");
+				*error = 1;
+			} else {
+				*error = -2;
+			}
 			return NULL;
 		}
 
@@ -47,18 +57,24 @@ static void *get_packet(int sockfd, Header *header, int *error) {
 
 int recieve_body(int sockfd, Body *body) {
 	body->string = NULL;
-	body->len = -1;
+	body->len = 0;
 	LIST_INIT(&body->head);
 
 	Header *header = malloc(sizeof *header);
 	int error = 0;
 	void *body_bytes = get_packet(sockfd, header, &error);
 
-	if (error) {
+	if (error == 1) {
 		free(header);
 		free(body_bytes);
 		header = body_bytes = NULL;
+		puts("Error in get_packet()");
 		return 1;
+	} else if (error == -2) {
+		free(header);
+		free(body_bytes);
+		header = body_bytes = NULL;
+		return -2;
 	}
 
 	while (header->index > 0) {
@@ -79,6 +95,7 @@ int recieve_body(int sockfd, Body *body) {
 			free(header);
 			free(body_bytes);
 			header = body_bytes = NULL;
+			puts("Error in get_packet()");
 			return 1;
 		}
 	}

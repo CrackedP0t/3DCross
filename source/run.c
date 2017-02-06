@@ -77,6 +77,20 @@ int start(int *sockfd_out) {
 		return 1;
 	}
 
+
+	struct timeval tv;
+	tv.tv_sec = 0;
+	tv.tv_usec = 5000;
+	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof tv)) {
+		close(sockfd);
+#if defined(_3DS)
+		socExit();
+		gfxExit();
+#endif
+		perror("Error in setsockopt()");
+		return 1;
+	}
+
 	struct sockaddr_in server;
 
 	uint32_t addr;
@@ -120,13 +134,11 @@ int loop(int sockfd) {
 	while (1) {
 #endif
 		Body *body = malloc(sizeof *body);
-		int error = recieve_body(sockfd, body);
+		int res = recieve_body(sockfd, body);
 
-		int res = 0;
-		if (error) {
+		if (res == 1) {
 			puts("Error in recieve_body()");
-			res = 1;
-		} else {
+		} else if (!res) {
 			res = handle_packet(sockfd, body);
 			if (res == -1) {
 				puts("Disconnect without error");
@@ -148,8 +160,6 @@ int loop(int sockfd) {
 		free(body);
 		body = NULL;
 
-		exit(0);
-
 		if (res == -1) {
 			return 0;
 		} else if (res == 1) {
@@ -166,8 +176,6 @@ int loop(int sockfd) {
 		gfxFlushBuffers();
 		gfxSwapBuffers();
 		gspWaitForVBlank();
-#elif defined(PC)
-		usleep(16000);
 #endif
 	}
 

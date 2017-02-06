@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <poll.h>
 #include <string.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
@@ -13,17 +14,37 @@ static void *get_packet(int sockfd, Header *header, int *error) {
 
 	void *header_bytes = malloc(HEADER_SIZE);
 
-	ssize_t header_len = recv(sockfd, header_bytes, HEADER_SIZE, 0);
-	if (header_len == -1) {
+	struct pollfd pfd;
+	pfd.fd = sockfd;
+	pfd.events = POLLIN;
+
+	int ev = poll(&pfd, 1, RECV_WAIT);
+
+	switch(ev) {
+	case -1:
+		perror("Error in header poll()");
 		free(header_bytes);
 		header_bytes = NULL;
-		if (errno != EAGAIN && errno != EWOULDBLOCK) {
-			perror("Error in header recv()");
-			*error = 1;
-		} else {
-			*error = -2;
-		}
+		*error = 1;
 		return NULL;
+
+	case 0:
+		free(header_bytes);
+		header_bytes = NULL;
+		*error = -2;
+		return NULL;
+
+	default:
+		;
+		ssize_t header_len = recv(sockfd, header_bytes, HEADER_SIZE, 0);
+		if (header_len == -1) {
+			perror("Error in header recv()");
+			free(header_bytes);
+			header_bytes = NULL;
+			*error = 1;
+			return NULL;
+		}
+		break;
 	}
 
 	decode_header(header, header_bytes);
@@ -36,20 +57,35 @@ static void *get_packet(int sockfd, Header *header, int *error) {
 	ssize_t total_len = 0;
 
 	while (total_len < header->size) {
-		ssize_t body_len = recv(sockfd, body_bytes + total_len, header->size - total_len, 0);
-		if (body_len == -1) {
+		int ev = poll(&pfd, 1, RECV_WAIT);
+
+		switch(ev) {
+		case -1:
+			perror("Error in body poll()");
 			free(body_bytes);
 			body_bytes = NULL;
-			if (errno != EAGAIN && errno != EWOULDBLOCK) {
-				perror("Error in body recv()");
-				*error = 1;
-			} else {
-				*error = -2;
-			}
+			*error = 1;
 			return NULL;
-		}
 
-		total_len += body_len;
+		case 0:
+			free(body_bytes);
+			body_bytes = NULL;
+			*error = -2;
+			return NULL;
+
+		default:
+			;
+			ssize_t body_len = recv(sockfd, body_bytes + total_len, header->size - total_len, 0);
+			if (body_len == -1) {
+				perror("Error in body recv()");
+				free(body_bytes);
+				body_bytes = NULL;
+				*error = 1;
+				return NULL;
+			}
+
+			total_len += body_len;
+		}
 	}
 
 	return body_bytes;

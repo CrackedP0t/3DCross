@@ -60,8 +60,8 @@ int start(int *sockfd_out) {
 	Result result;
 	result = socInit((u32*)memalign(0x1000, 0x128000), 0x128000);
 	if (R_FAILED(result)) {
-		gfxExit();
 		puts("Error in socInit()");
+		gfxExit();
 		return 1;
 	}
 #endif
@@ -69,25 +69,11 @@ int start(int *sockfd_out) {
 	int sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	*sockfd_out = sockfd;
 	if (sockfd == -1) {
-#if defined(_3DS)
-		socExit();
-		gfxExit();
-#endif
 		perror("Error in socket()");
-		return 1;
-	}
-
-
-	struct timeval tv;
-	tv.tv_sec = 0;
-	tv.tv_usec = 5000;
-	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof tv)) {
-		close(sockfd);
 #if defined(_3DS)
 		socExit();
 		gfxExit();
 #endif
-		perror("Error in setsockopt()");
 		return 1;
 	}
 
@@ -105,22 +91,22 @@ int start(int *sockfd_out) {
 	server.sin_port = htons(SERVER_PORT);
 
 	if (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) == -1) {
+		perror("Error in connect()");
+		puts("Guess: the IP or port cannot be reached");
 		close(sockfd);
 #if defined(_3DS)
 		socExit();
 		gfxExit();
 #endif
-		perror("Error in connect()");
-		puts("Guess: the IP or port cannot be reached");
 		return 1;
 	}
 	if (!send_hello(sockfd)) {
+		puts("Error in send_hello()");
 		close(sockfd);
 #if defined(_3DS)
 		socExit();
 		gfxExit();
 #endif
-		puts("Error in send_hello()");
 		return 1;
 	}
 

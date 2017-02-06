@@ -83,11 +83,11 @@ int recieve_body(int sockfd, Body *body) {
 		}
 	}
 
-	free(header);
-	header = NULL;
-
 	body->string = (char *)body_bytes;
 	body->len = header->size;
+
+	free(header);
+	header = NULL;
 
 	return 0;
 }

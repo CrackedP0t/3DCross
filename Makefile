@@ -37,8 +37,8 @@ DESCRIPTION := Screen mirroring.
 AUTHOR := CrackedP0t
 # 3DS CONFIGURATION #
 
-LIBRARY_DIRS += $(DEVKITPRO)/libctru
-LIBRARIES += ctru
+LIBRARY_DIRS += $(DEVKITPRO)/libctru $(DEVKITPRO)/portlibs/armv6k
+LIBRARIES += sfil png jpeg z sf2d citro3d ctru m
 
 PRODUCT_CODE := CTR-P-TEMP
 UNIQUE_ID := 0xF8000

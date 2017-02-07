@@ -18,7 +18,7 @@ static void *get_packet(int sockfd, Header *header, int *error) {
 	pfd.fd = sockfd;
 	pfd.events = POLLIN;
 
-	int ev = poll(&pfd, 1, RECV_WAIT);
+	int ev = poll(&pfd, 1, HEADER_WAIT);
 
 	switch(ev) {
 	case -1:
@@ -47,17 +47,33 @@ static void *get_packet(int sockfd, Header *header, int *error) {
 		break;
 	}
 
+	print_bytes(header_bytes, 8);
+
 	decode_header(header, header_bytes);
 
 	free(header_bytes);
 	header_bytes = NULL;
+
+	if (header->magic != 'P') {
+		puts("Incorrect magic byte");
+		puts("Guess: Not an Xpra server");
+		*error = 1;
+		return NULL;
+	}
+
+	if (header->size > 0xffffff) {
+		puts("Header size too large");
+		puts("Guess: Not an Xpra server");
+		*error = 1;
+		return NULL;
+	}
 
 	void *body_bytes = malloc(header->size);
 
 	ssize_t total_len = 0;
 
 	while (total_len < header->size) {
-		int ev = poll(&pfd, 1, RECV_WAIT);
+		int ev = poll(&pfd, 1, BODY_WAIT);
 
 		switch(ev) {
 		case -1:
@@ -68,9 +84,11 @@ static void *get_packet(int sockfd, Header *header, int *error) {
 			return NULL;
 
 		case 0:
+			puts("Timeout in body poll()");
+			puts("Guess: Server no longer connected");
 			free(body_bytes);
 			body_bytes = NULL;
-			*error = -2;
+			*error = 1;
 			return NULL;
 
 		default:

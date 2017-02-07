@@ -4,12 +4,14 @@ void error_start();
 
 void error_loop();
 
-void error_end();
+void error_end(int shouldEnd);
 
-int start(int *sockfd_out);
+void error_run(int shouldEnd);
 
-int loop(int sockfd);
+int start();
 
-int end(int sockfd);
+int loop();
+
+int end();
 
 void run();

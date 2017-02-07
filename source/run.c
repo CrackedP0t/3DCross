@@ -1,26 +1,24 @@
-#include <arpa/inet.h>
 #include <errno.h>
 #include <malloc.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #if defined(_3DS)
 #include <3ds.h>
+#include <sf2d.h>
 #endif
 
+#include "connect.h"
 #include "handle.h"
 #include "hello.h"
 #include "recieve.h"
 #include "run.h"
 
-#define SERVER_IP "192.168.0.21"
-#define SERVER_PORT 14500
-
 void error_start() {
-	puts("An error has occured! Please report it.");
+	puts("An error has occured!");
+	puts("If it wasn't your fault, please report it!");
 
 #if defined(_3DS)
 	puts("Press start to exit.");
@@ -38,171 +36,145 @@ void error_loop() {
 #endif
 }
 
-void error_end(int sockfd, int shouldEnd) {
+void error_end(int shouldEnd) {
 	if (shouldEnd) {
-		end(sockfd);
+		end();
 	}
-
-	exit(0);
 }
 
-void error_run(int sockfd, int shouldEnd) {
+void error_run(int shouldEnd) {
 	error_start();
 	error_loop();
-	error_end(sockfd, shouldEnd);
+	error_end(shouldEnd);
 }
 
-int start(int *sockfd_out) {
+int start() {
 #if defined(_3DS)
-	gfxInitDefault();
+	if (!sf2d_init()) {
+		puts("Error in sf2d_init()");
+		return 1;
+	}
+
 	consoleInit(GFX_BOTTOM, NULL);
 
 	Result result;
 	result = socInit((u32*)memalign(0x1000, 0x128000), 0x128000);
 	if (R_FAILED(result)) {
 		puts("Error in socInit()");
-		gfxExit();
+		sf2d_fini();
 		return 1;
 	}
 #endif
-
-	int sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	*sockfd_out = sockfd;
-	if (sockfd == -1) {
-		perror("Error in socket()");
-#if defined(_3DS)
-		socExit();
-		gfxExit();
-#endif
-		return 1;
-	}
-
-	struct sockaddr_in server;
-
-	uint32_t addr;
-	int addr_res;
-
-	do {
-		addr_res = inet_pton(AF_INET, SERVER_IP, &addr);
-	} while (addr_res != 1);
-
-	server.sin_addr.s_addr = addr;
-	server.sin_family = AF_INET;
-	server.sin_port = htons(SERVER_PORT);
-
-	if (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) == -1) {
-		perror("Error in connect()");
-		puts("Guess: the IP or port cannot be reached");
-		close(sockfd);
-#if defined(_3DS)
-		socExit();
-		gfxExit();
-#endif
-		return 1;
-	}
-	if (!send_hello(sockfd)) {
-		puts("Error in send_hello()");
-		close(sockfd);
-#if defined(_3DS)
-		socExit();
-		gfxExit();
-#endif
-		return 1;
-	}
 
 	return 0;
 }
 
-int loop(int sockfd) {
+int loop() {
+	int connected = 0;
+	int sockfd = -1;
 #if defined(_3DS)
 	while(aptMainLoop()) {
 #elif defined(PC)
 	while (1) {
 #endif
-		Body *body = malloc(sizeof *body);
-		int res = recieve_body(sockfd, body);
+		if (connected) {
+			Body *body = malloc(sizeof *body);
+			int res = recieve_body(sockfd, body);
 
-		if (res == 1) {
-			puts("Error in recieve_body()");
-		} else if (!res) {
-			res = handle_packet(sockfd, body);
-			if (res == -1) {
-				puts("Disconnect without error");
-			} else if (res == 1) {
-				puts("Error in handle_packet()");
+			if (res == 1) {
+				puts("Error in recieve_body()");
+			} else if (!res) {
+				res = handle_packet(sockfd, body);
+				if (res == -1) {
+					puts("Disconnect normally");
+				} else if (res == 1) {
+					puts("Error in handle_packet()");
+				}
 			}
-		}
 
-		Chunk *chunk = NULL;
-		Chunk *next = NULL;
-		LIST_FOREACH_SAFE(chunk, &body->head, chunks, next) {
-			LIST_REMOVE(chunk, chunks);
-			free(chunk->bytes);
-			free(chunk);
-			chunk = NULL;
-		}
+			Chunk *chunk = NULL;
+			Chunk *next = NULL;
+			LIST_FOREACH_SAFE(chunk, &body->head, chunks, next) {
+				LIST_REMOVE(chunk, chunks);
+				free(chunk->bytes);
+				free(chunk);
+				chunk = NULL;
+			}
 
-		free(body->string);
-		free(body);
-		body = NULL;
+			free(body->string);
+			free(body);
+			body = NULL;
 
-		if (res == -1) {
-			return 0;
-		} else if (res == 1) {
-			return 1;
+			if (res == -1) {
+				if (end_connect(sockfd)) {
+					puts("Error in end_connect()");
+					return 1;
+				} else {
+					connected = 0;
+					sockfd = -1;
+				}
+			} else if (res == 1) {
+				end_connect(sockfd);
+				return 1;
+			}
+		} else {
+			if (begin_connect(&sockfd)) {
+				puts("Error in begin_connect()");
+				return 1;
+			} else {
+				connected = 1;
+			}
 		}
 
 #if defined(_3DS)
 		hidScanInput();
 		if(hidKeysDown() & KEY_START) {
 			puts("Exit command recieved");
-			return 0;
+			if (connected && end_connect(sockfd)) {
+				puts("Error in end_connect()");
+				return 1;
+			} else {
+				return 0;
+			}
 		}
-
-		gfxFlushBuffers();
-		gfxSwapBuffers();
-		gspWaitForVBlank();
 #endif
 	}
 
- 	return 0;
+	if (end_connect(sockfd)) {
+		puts("Error in end_connect()");
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
-int end(int sockfd) {
+int end() {
 	int error = 0;
 
-	if (close(sockfd) == -1) {
-		if (errno != EBADF) {
-			perror("Error in close()");
-			error = 1;
-		}
-	}
-
 #if defined(_3DS)
-	Result result;
-	result = socExit();
-	if (R_FAILED(result)) {
+	if (R_FAILED(socExit())) {
 		puts("Error in socExit()");
 		error = 1;
 	}
 
-	gfxExit();
+	if (!sf2d_fini()) {
+		puts("Error in sf2d_fini()");
+		error = 1;
+	}
 #endif
 
 	return error;
 }
 
 void run() {
-	int sockfd;
-
-	if (start(&sockfd)) {
-		error_run(sockfd, 0);
+	if (start()) {
+		error_run(0);
 	} else {
-		if (loop(sockfd)) {
-			error_run(sockfd, 1);
+		if (loop()) {
+			error_run(1);
 		} else {
-			if (end(sockfd)) {
-				error_run(sockfd, 0);
+			if (end()) {
+				error_run(0);
 			}
 		}
 	}

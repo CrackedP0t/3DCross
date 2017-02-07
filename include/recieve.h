@@ -5,6 +5,9 @@
 
 #include "queue.h"
 
+#define HEADER_WAIT 5
+#define BODY_WAIT 1000
+
 typedef struct Chunk_s {
 	uint8_t index;
 	void *bytes;

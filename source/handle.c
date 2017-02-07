@@ -1,5 +1,11 @@
+#include <queue.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if defined(_3DS)
+#include <sf2d.h>
+#include <sfil.h>
+#endif
 
 #include "encoder.h"
 #include "handle.h"
@@ -37,6 +43,47 @@ static inline int handle_new_window(int sockfd, Body *body) {
 	ben_free(obj);
 	ben_free(response);
 	obj = response = NULL;
+
+	return 0;
+}
+
+static inline int handle_draw(int sockfd, Body *body) {
+	size_t off = 0;
+	int error;
+
+	Bencode *obj = ben_decode2(body->string, body->len, &off, &error);
+
+	if (error) {
+		ben_free(obj);
+		obj = NULL;
+		return 1;
+	}
+
+	// name, wid, x, y, width, height, coding, data, packet_sequence, rowstride
+	const char *coding = ben_str_val(ben_list_get(obj, 6));
+
+	if (!strcmp(coding, "png")) {
+		Chunk *chunk = NULL;
+
+		LIST_FOREACH(chunk, &body->head, chunks) {
+			if (chunk->index == 7) {
+#if defined(_3DS)
+				sf2d_texture *image = sfil_load_PNG_buffer(chunk->bytes, SF2D_PLACE_RAM);
+
+				sf2d_start_frame(GFX_TOP, GFX_LEFT);
+
+				sf2d_draw_texture(image, 0, 0);
+
+				sf2d_end_frame();
+
+				sf2d_swapbuffers();
+
+				sf2d_free_texture(image);
+#endif
+				break;
+			}
+		}
+	}
 
 	return 0;
 }
@@ -86,13 +133,7 @@ int handle_packet(int sockfd, Body *body) {
 	Bencode *obj = ben_decode2(body->string, body->len, &off, &error);
 
 	if (!error) {
-		Bencode *name_ben = ben_clone(ben_list_get(obj, 0));
-
-		size_t name_len = ben_str_len(name_ben) + 1; // For \0 at end
-		const char *name_str = ben_str_val(name_ben);
-
-		char *name = malloc(name_len);
-		memcpy(name, name_str, name_len);
+		const char *name = ben_str_val(ben_list_get(obj, 0));
 
 		printf("recv: %s\n", name);
 
@@ -100,6 +141,8 @@ int handle_packet(int sockfd, Body *body) {
 			res = handle_hello(sockfd, body);
 		} else if (!strcmp(name, "new-window")) {
 			res = handle_new_window(sockfd, body);
+		} else if (!strcmp(name, "draw")) {
+			res = handle_draw(sockfd, body);
 		} else if (!strcmp(name, "ping")) {
 			res = handle_ping(sockfd, body);
 		} else if (!strcmp(name, "disconnect")) {
@@ -109,11 +152,6 @@ int handle_packet(int sockfd, Body *body) {
 		if (res == 1) {
 			puts("Error in handler");
 		}
-
-		ben_free(name_ben);
-		free(name);
-		name_ben = NULL;
-		name = NULL;
 	} else {
 		puts("Error in ben_decode2()");
 		res = 1;

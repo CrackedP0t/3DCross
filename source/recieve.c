@@ -47,8 +47,6 @@ static void *get_packet(int sockfd, Header *header, int *error) {
 		break;
 	}
 
-	print_bytes(header_bytes, 8);
-
 	decode_header(header, header_bytes);
 
 	free(header_bytes);

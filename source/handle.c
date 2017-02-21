@@ -43,7 +43,7 @@ DEF_HANDLER(handle_draw) {
 
 	struct timeval start_tv;
 	gettimeofday(&start_tv, NULL);
-	uint64_t start_usec = (1000000*start_tv.tv_sec) + start_tv.tv_usec;
+	uint64_t start_usec = (1000000 * start_tv.tv_sec) + start_tv.tv_usec;
 
 	// name, wid, x, y, width, height, coding, data, packet_sequence, rowstride
 

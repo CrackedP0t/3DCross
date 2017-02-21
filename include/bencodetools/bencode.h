@@ -334,6 +334,9 @@ char *ben_print(const struct bencode *b);
 /* Create a string from C string (note bencode string may contain '\0'. */
 struct bencode *ben_str(const char *s);
 
+/* Create a string from raw bytes, with length given by len */
+struct bencode *ben_bytes(const void *b, size_t len);
+
 /* Return a human readable explanation of error returned with ben_decode2() */
 const char *ben_strerror(int error);
 

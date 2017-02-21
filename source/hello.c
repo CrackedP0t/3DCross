@@ -24,15 +24,21 @@ static inline Bencode *create_caps() {
 	Bencode *encoders = ben_list();
 	ben_list_append(encoders, ben_str("bencode"));
 
+	Bencode *rgb_formats = ben_list();
+	ben_list_append(rgb_formats, ben_str("RGB"));
+
 	ben_dict_set_by_str(caps, "bencode", ben_int(1));
 	ben_dict_set_by_str(caps, "rencode", ben_int(0));
+	ben_dict_set_by_str(caps, "generic-rgb-encodings", ben_int(0));
 	ben_dict_set_by_str(caps, "encoders", encoders);
 	ben_dict_set_by_str(caps, "encodings", encodings);
+	ben_dict_set_by_str(caps, "encodings.rgb_formats", rgb_formats);
+	ben_dict_set_by_str(caps, "encoding.transparency", ben_int(1));
 	ben_dict_set_by_str(caps, "keyboard", ben_int(0));
 
 	// A capability is missing somewhere, so when another client joins and sends
 	// the info-request packet the server errors and disconnects it
-	ben_dict_set_by_str(caps, "share", ben_int(0));
+	ben_dict_set_by_str(caps, "share", ben_int(1));
 
 	Bencode *size = ben_list();
 	ben_list_append(size, ben_int(400));

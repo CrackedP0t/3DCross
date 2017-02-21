@@ -1,13 +1,24 @@
 #include <errno.h>
 #include <poll.h>
 #include <string.h>
-#include <sys/queue.h>
 #include <sys/socket.h>
 
 #include "encoder.h"
 #include "packet.h"
+#include "queue.h"
 #include "recieve.h"
 #include "util.h"
+
+static void clear_chunks(ChunkHead *head) {
+	Chunk *chunk = NULL;
+	Chunk *next = NULL;
+	LIST_FOREACH_SAFE(chunk, head, chunks, next) {
+		LIST_REMOVE(chunk, chunks);
+		free(chunk->bytes);
+		free(chunk);
+		chunk = NULL;
+	}
+}
 
 static void *get_packet(int sockfd, Header *header, int *error) {
 	*error = 0;
@@ -107,56 +118,70 @@ static void *get_packet(int sockfd, Header *header, int *error) {
 	return body_bytes;
 }
 
-int recieve_body(int sockfd, Body *body) {
-	body->string = NULL;
-	body->len = 0;
-	LIST_INIT(&body->head);
+int recieve_bencode(int sockfd, Bencode **obj) {
+	ChunkHead head;
+	LIST_INIT(&head);
 
-	Header *header = malloc(sizeof *header);
+	Header header;
 	int error = 0;
-	void *body_bytes = get_packet(sockfd, header, &error);
+	void *body_bytes = get_packet(sockfd, &header, &error);
 
 	if (error == 1) {
-		free(header);
 		free(body_bytes);
-		header = body_bytes = NULL;
+		body_bytes = NULL;
 		puts("Error in get_packet()");
 		return 1;
 	} else if (error == -2) {
-		free(header);
 		free(body_bytes);
-		header = body_bytes = NULL;
+		body_bytes = NULL;
 		return -2;
 	}
 
-	while (header->index > 0) {
+	while (header.index > 0) {
 		Chunk *chunk = malloc(sizeof *chunk);
-		chunk->index = header->index;
+		chunk->index = header.index;
 		chunk->bytes = body_bytes;
-		chunk->len = header->size;
+		chunk->len = header.size;
 
-		LIST_INSERT_HEAD(&body->head, chunk, chunks);
+		LIST_INSERT_HEAD(&head, chunk, chunks);
 
-		free(header);
-		header = NULL;
-
-		header = malloc(sizeof *header);
-		body_bytes = get_packet(sockfd, header, &error);
+		body_bytes = get_packet(sockfd, &header, &error);
 
 		if (error) {
-			free(header);
+			clear_chunks(&head);
 			free(body_bytes);
-			header = body_bytes = NULL;
+			body_bytes = NULL;
 			puts("Error in get_packet()");
 			return 1;
 		}
 	}
 
-	body->string = (char *)body_bytes;
-	body->len = header->size;
+	size_t off = 0;
+	*obj = ben_decode2(body_bytes, header.size, &off, &error);
 
-	free(header);
-	header = NULL;
+	free(body_bytes);
+	body_bytes = NULL;
 
+	size_t obj_len = ben_list_len(*obj);
+
+	Chunk *chunk = NULL;
+	LIST_FOREACH(chunk, &head, chunks) {
+		if (chunk->index > obj_len - 1) {
+			puts("Chunk index invalid");
+			clear_chunks(&head);
+			return 1;
+		} else {
+			ben_list_set(*obj, chunk->index, ben_bytes(chunk->bytes, chunk->len));
+		}
+	}
+
+	clear_chunks(&head);
+
+	if (error != BEN_OK) {
+		printf("Error in ben_decode2(): %s", ben_strerror(error));
+		ben_free(*obj);
+		*obj = NULL;
+		return 1;
+	}
 	return 0;
 }

@@ -2,6 +2,13 @@
 
 #include <stdarg.h>
 
+#if defined(_3DS)
+#include <sf2d.h>
+#endif
+
+#include "encoder.h"
 #include "recieve.h"
 
-int handle_packet(int sockfd, Body *decoded);
+#define DEF_HANDLER(name) static int name(int sockfd, Bencode *obj)
+
+int handle_packet(int sockfd, Bencode *obj);

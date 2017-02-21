@@ -7,7 +7,6 @@
 
 #if defined(_3DS)
 #include <3ds.h>
-#include <sf2d.h>
 #endif
 
 #include "connect.h"
@@ -15,10 +14,11 @@
 #include "hello.h"
 #include "recieve.h"
 #include "run.h"
+#include "util.h"
 
 void error_start() {
 	puts("An error has occured!");
-	puts("If it wasn't your fault, please report it!");
+	puts("If this is a bug, please report it!");
 
 #if defined(_3DS)
 	puts("Press start to exit.");
@@ -50,10 +50,7 @@ void error_run(int shouldEnd) {
 
 int start() {
 #if defined(_3DS)
-	if (!sf2d_init()) {
-		puts("Error in sf2d_init()");
-		return 1;
-	}
+	gfxInitDefault();
 
 	consoleInit(GFX_BOTTOM, NULL);
 
@@ -61,7 +58,6 @@ int start() {
 	result = socInit((u32*)memalign(0x1000, 0x128000), 0x128000);
 	if (R_FAILED(result)) {
 		puts("Error in socInit()");
-		sf2d_fini();
 		return 1;
 	}
 #endif
@@ -70,21 +66,28 @@ int start() {
 }
 
 int loop() {
+	int retval = 0;
+
 	int connected = 0;
 	int sockfd = -1;
+
 #if defined(_3DS)
 	while(aptMainLoop()) {
-#elif defined(PC)
+#else
 	while (1) {
 #endif
+#if defined(_3DS)
+		hidScanInput();
+#endif
+
 		if (connected) {
-			Body *body = malloc(sizeof *body);
-			int res = recieve_body(sockfd, body);
+			Bencode *obj = NULL;
+			int res = recieve_bencode(sockfd, &obj);
 
 			if (res == 1) {
-				puts("Error in recieve_body()");
+				puts("Error in recieve_bencode()");
 			} else if (!res) {
-				res = handle_packet(sockfd, body);
+				res = handle_packet(sockfd, obj);
 				if (res == -1) {
 					puts("Disconnect normally");
 				} else if (res == 1) {
@@ -92,42 +95,31 @@ int loop() {
 				}
 			}
 
-			Chunk *chunk = NULL;
-			Chunk *next = NULL;
-			LIST_FOREACH_SAFE(chunk, &body->head, chunks, next) {
-				LIST_REMOVE(chunk, chunks);
-				free(chunk->bytes);
-				free(chunk);
-				chunk = NULL;
-			}
-
-			free(body->string);
-			free(body);
-			body = NULL;
+			ben_free(obj);
+			obj = NULL;
 
 			if (res == -1) {
+				connected = 0;
+				sockfd = -1;
 				if (end_connect(sockfd)) {
 					puts("Error in end_connect()");
-					return 1;
-				} else {
-					connected = 0;
-					sockfd = -1;
+					retval = 1;
+					break;
 				}
 			} else if (res == 1) {
-				end_connect(sockfd);
-				return 1;
+				retval = 1;
+				break;
 			}
 		} else {
 			if (begin_connect(&sockfd)) {
-				puts("Error in begin_connect()");
-				return 1;
+				retval = 1;
+				break;
 			} else {
 				connected = 1;
 			}
 		}
 
 #if defined(_3DS)
-		hidScanInput();
 		if(hidKeysDown() & KEY_START) {
 			puts("Exit command recieved");
 			if (connected && end_connect(sockfd)) {
@@ -140,11 +132,11 @@ int loop() {
 #endif
 	}
 
-	if (end_connect(sockfd)) {
+	if (connected && end_connect(sockfd)) {
 		puts("Error in end_connect()");
 		return 1;
 	} else {
-		return 0;
+		return retval;
 	}
 }
 
@@ -157,10 +149,7 @@ int end() {
 		error = 1;
 	}
 
-	if (!sf2d_fini()) {
-		puts("Error in sf2d_fini()");
-		error = 1;
-	}
+	gfxExit();
 #endif
 
 	return error;

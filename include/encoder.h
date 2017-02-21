@@ -1,10 +1,10 @@
 #pragma once
 
-#include <stdlib.h>
+#include "bencodetools/bencode.h"
 
-#define ENCODER bencode
 #define ENCODER_ID 0
 
-#include "bencodetools/bencode.h"
+#define BEN_GETCLAPP(dest, src, index) \
+	ben_list_append(dest, ben_clone(ben_list_get(src, index)))
 
 typedef struct bencode Bencode;

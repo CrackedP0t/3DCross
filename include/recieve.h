@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
+#include "encoder.h"
 #include "queue.h"
 
 #define HEADER_WAIT 5
@@ -18,10 +19,4 @@ typedef struct Chunk_s {
 
 typedef LIST_HEAD(ChunkHead_s, Chunk_s) ChunkHead;
 
-typedef struct {
-	char *string;
-	size_t len;
-	ChunkHead head;
-} Body;
-
-int recieve_body(int sockfd, Body *body);
+int recieve_bencode(int sockfd, Bencode **body);

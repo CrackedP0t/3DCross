@@ -38,9 +38,9 @@ AUTHOR := CrackedP0t
 # 3DS CONFIGURATION #
 
 LIBRARY_DIRS += $(DEVKITPRO)/libctru $(DEVKITPRO)/portlibs/armv6k
-LIBRARIES += sfil png jpeg z sf2d citro3d ctru m
+LIBRARIES += z ctru m
 
-PRODUCT_CODE := CTR-P-TEMP
+PRODUCT_CODE := CTR-P-3DCR
 UNIQUE_ID := 0xF8000
 
 CATEGORY := Application
@@ -69,7 +69,7 @@ endif
 ifeq ($(TARGET), PC)
 all:
 	mkdir -p $(OUTPUT_DIR)/pc
-	gcc -Wall -g -DPC source/*.c -Iinclude -o $(OUTPUT_DIR)/pc/$(NAME)
+	gcc -Wall -g -DPC source/*.c -lm -lz -Iinclude -o $(OUTPUT_DIR)/pc/$(NAME)
 
 clean:
 	rm -r $(OUTPUT_DIR)

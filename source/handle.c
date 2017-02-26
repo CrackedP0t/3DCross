@@ -7,11 +7,16 @@
 #endif
 #include <zlib.h>
 
+#include "draw.h"
 #include "encoder.h"
 #include "handle.h"
 #include "send.h"
 #include "stb_image.h"
 #include "util.h"
+
+static int fb_number = 1;
+
+static int old_width, old_height = -1;
 
 DEF_HANDLER(handle_hello) {
 	return 0;
@@ -19,6 +24,9 @@ DEF_HANDLER(handle_hello) {
 
 DEF_HANDLER(handle_new_window) {
 	//name, wid, x, y, w, h, info
+
+	old_width = ben_int_val(ben_list_get(obj, 4));
+	old_height = ben_int_val(ben_list_get(obj, 5));
 
 	Bencode *response = ben_list();
 
@@ -39,8 +47,6 @@ DEF_HANDLER(handle_new_window) {
 }
 
 DEF_HANDLER(handle_draw) {
-	static int fb_number = 1;
-
 	struct timeval start_tv;
 	gettimeofday(&start_tv, NULL);
 	uint64_t start_usec = (1000000 * start_tv.tv_sec) + start_tv.tv_usec;
@@ -103,12 +109,9 @@ DEF_HANDLER(handle_draw) {
 		for (int y = 0; y < region_height && img_y + y < TOP_H; y++) {
 			for (int x = 0; x < region_width && img_x + x < TOP_W; x++) {
 				int pos_img = 3 * (x + y * width);
-				int pos_3ds = 3 * ((TOP_H - 1 - (img_y + y)) + (img_x + x) * TOP_H);
 
-				// 3DS does BGR and we're sent RGB, so flip the order
-				fb[pos_3ds + 0] = image[pos_img + 2];
-				fb[pos_3ds + 1] = image[pos_img + 1];
-				fb[pos_3ds + 2] = image[pos_img + 0];
+				set_3ds_fb_top(fb, img_x + x, img_y + y
+						   , image[pos_img + 0], image[pos_img + 1], image[pos_img + 2]);
 			}
 		}
 
@@ -142,6 +145,32 @@ DEF_HANDLER(handle_draw) {
 
 	ben_free(response);
 	response = NULL;
+
+	return 0;
+}
+
+DEF_HANDLER(handle_window_resized) {
+	int new_width = ben_int_val(ben_list_get(obj, 2));
+	int new_height = ben_int_val(ben_list_get(obj, 3));
+
+#if defined(_3DS)
+	u8* fb = gfxTopLeftFramebuffers[fb_number];
+
+	for (int y = new_height; y < old_height && y < TOP_H; y++) {
+		for (int x = 0; x < old_width && x < TOP_W; x++) {
+			set_3ds_fb_top(fb, x, y, 0, 0, 0);
+		}
+	}
+
+	for (int x = new_width; x < old_width && x < TOP_W; x++) {
+		for (int y = 0; y < old_height && y < TOP_H; y++) {
+			set_3ds_fb_top(fb, x, y, 0, 0, 0);
+		}
+	}
+#endif
+
+	old_width = new_width;
+	old_height = new_height;
 
 	return 0;
 }
@@ -182,6 +211,8 @@ int handle_packet(int sockfd, Bencode *obj) {
 		res = handle_new_window(sockfd, obj);
 	} else if (!strcmp(name, "draw")) {
 		res = handle_draw(sockfd, obj);
+	} else if (!strcmp(name, "window-resized")) {
+		res = handle_window_resized(sockfd, obj);
 	} else if (!strcmp(name, "ping")) {
 		res = handle_ping(sockfd, obj);
 	} else if (!strcmp(name, "disconnect")) {

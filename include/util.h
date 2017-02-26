@@ -2,6 +2,10 @@
 
 #include <stdlib.h>
 
+#if defined(_3DS)
+#include <3ds.h>
+#endif
+
 #define TOP_W 400
 #define TOP_H 240
 #define BOT_W 320

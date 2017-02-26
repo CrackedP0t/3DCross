@@ -26,8 +26,8 @@ DEF_HANDLER(handle_new_window) {
 	BEN_GETCLAPP(response, obj, 1);
 	ben_list_append(response, ben_int(0));
 	ben_list_append(response, ben_int(0));
-	ben_list_append(response, ben_int(TOP_AW));
-	ben_list_append(response, ben_int(TOP_AH));
+	ben_list_append(response, ben_int(TOP_W));
+	ben_list_append(response, ben_int(TOP_H));
 	BEN_GETCLAPP(response, obj, 7);
 
 	send_bencode(sockfd, response);
@@ -97,13 +97,13 @@ DEF_HANDLER(handle_draw) {
 	if (image) {
 		u8* fb = gfxTopLeftFramebuffers[fb_number];
 
-		int region_width = MIN(int, width, TOP_AW);
-		int region_height = MIN(int, height, TOP_AH);
+		int region_width = MIN(int, width, TOP_W);
+		int region_height = MIN(int, height, TOP_H);
 
-		for (int y = 0; y < region_height && img_y + y < TOP_AH; y++) {
-			for (int x = 0; x < region_width && img_x + x < TOP_AW; x++) {
+		for (int y = 0; y < region_height && img_y + y < TOP_H; y++) {
+			for (int x = 0; x < region_width && img_x + x < TOP_W; x++) {
 				int pos_img = 3 * (x + y * width);
-				int pos_3ds = 3 * ((img_x + x) + (img_y + y) * TOP_AW);
+				int pos_3ds = 3 * ((TOP_H - 1 - (img_y + y)) + (img_x + x) * TOP_H);
 
 				// 3DS does BGR and we're sent RGB, so flip the order
 				fb[pos_3ds + 0] = image[pos_img + 2];

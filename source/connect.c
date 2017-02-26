@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <malloc.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -21,29 +22,23 @@ int begin_connect(int *sockfd_out) {
 
 	struct sockaddr_in server;
 
-	IPEnterRes *ip_res = malloc(sizeof *ip_res);
-	*ip_res = (IPEnterRes){.addr = 0, .error = 0};
+	uint32_t addr;
 
-#if defined(_3DS)
-	ip_res->error = !inet_pton(AF_INET, SERVER_IP, &ip_res->addr);
-#else
-	ip_res->error = !inet_pton(AF_INET, SERVER_IP, &ip_res->addr);
-#endif
+	int pton_error = inet_pton(AF_INET, SERVER_IP, &addr);
 
-	if (ip_res->error) {
+	if (pton_error == 0) {
+		puts("IP address invalid");
+		close(sockfd);
+		return 1;
+	} else if (pton_error == -1) {
 		perror("Error in inet_pton()");
 		close(sockfd);
-		free(ip_res);
-		ip_res = NULL;
 		return 1;
 	}
 
-	server.sin_addr.s_addr = ip_res->addr;
+	server.sin_addr.s_addr = addr;
 	server.sin_family = AF_INET;
 	server.sin_port = htons(SERVER_PORT);
-
-	free(ip_res);
-	ip_res = NULL;
 
 	if (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) == -1) {
 		perror("Error in connect()");
@@ -62,14 +57,10 @@ int begin_connect(int *sockfd_out) {
 }
 
 int end_connect(int sockfd) {
-	int error = 0;
-
-	if (close(sockfd) == -1) {
-		if (errno != EBADF) {
-			perror("Error in close()");
-			error = 1;
-		}
+	if (close(sockfd) == -1 && errno != 0) {
+		perror("Error in close()");
+		return 1;
 	}
 
-	return error;
+	return 0;
 }

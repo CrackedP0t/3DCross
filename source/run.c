@@ -72,12 +72,18 @@ int loop() {
 	int sockfd = -1;
 
 #if defined(_3DS)
+	puts("Press A to connect to " SERVER_IP);
+
 	while(aptMainLoop()) {
 #else
 	while (1) {
 #endif
 #if defined(_3DS)
 		hidScanInput();
+
+		u32 heldButtons = hidKeysHeld();
+		u32 downButtons = hidKeysDown();
+		u32 upButtons = hidKeysUp();
 #endif
 
 		if (connected) {
@@ -106,29 +112,41 @@ int loop() {
 					retval = 1;
 					break;
 				}
+
+#if defined(_3DS)
+				puts("Press A to connect to " SERVER_IP);
+#endif
 			} else if (res == 1) {
-				retval = 1;
+				retval = res;
 				break;
 			}
 		} else {
+#if defined(_3DS)
+			if (downButtons & KEY_A) {
+#endif
 			if (begin_connect(&sockfd)) {
-				retval = 1;
-				break;
+				puts("Couldn't connect");
+
+#if defined(_3DS)
+				puts("Press A to connect to " SERVER_IP);
+#endif
 			} else {
+				puts("Successfully connected");
 				connected = 1;
 			}
+#if defined(_3DS)
+			}
+#endif
 		}
 
 #if defined(_3DS)
-		if(hidKeysDown() & KEY_START) {
+		if(heldButtons & KEY_START) {
 			puts("Exit command recieved");
-			if (connected && end_connect(sockfd)) {
-				puts("Error in end_connect()");
-				return 1;
-			} else {
-				return 0;
-			}
+
+			break;
 		}
+
+		gspWaitForVBlank();
 #endif
 	}
 
